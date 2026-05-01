@@ -1,0 +1,19 @@
+# MS17-010 Remediation Agent dependencies
+
+# WinRM client for remote Windows management
+pywinrm>=0.4.3
+
+# HTTP requests
+requests>=2.31.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# CLI argument parsing
+click>=8.1.0
+
+# Logging
+loguru>=0.7.0
+
+# Metasploit RPC client
+pymetasploit3>=1.0.3

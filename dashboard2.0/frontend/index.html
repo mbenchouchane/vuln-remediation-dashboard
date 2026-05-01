@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vulnerability Management Hub</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-main">
+                <h1>
+                    🛡️ Vulnerability Management Hub
+                </h1>
+                <p class="header-subtitle">Suivi global de l'exposition et de la remédiation</p>
+            </div>
+
+            <div class="header-filters">
+                <div class="filter-group">
+                    <label for="time-range">Période</label>
+                    <select id="time-range">
+                        <option value="30">30 derniers jours</option>
+                        <option value="90">90 derniers jours</option>
+                        <option value="365">12 derniers mois</option>
+                        <option value="all">Tout</option>
+                    </select>
+                </div>
+                <!-- Placeholder pour un futur filtre par cible/projet -->
+                <div class="filter-group disabled">
+                    <label>Scope</label>
+                    <select disabled>
+                        <option>Tout l'environnement</option>
+                    </select>
+                </div>
+            </div>
+        </header>
+
+        <!-- KPI cards / hero section -->
+        <div class="dashboard">
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <h3>Total Scans</h3>
+                    <span class="trend-indicator" id="scans-trend-indicator">—</span>
+                </div>
+                <p id="total-scans">0</p>
+                <div class="stat-sub" id="total-scans-sub">Scans importés</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <h3>Open Vulnerabilities</h3>
+                    <span class="trend-indicator" id="open-vulns-trend">—</span>
+                </div>
+                <p id="total-vulns">0</p>
+                <div class="stat-sub" id="total-vulns-sub">Toutes sévérités confondues</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <h3>Critical</h3>
+                    <span class="badge badge-critical" id="critical-share">0%</span>
+                </div>
+                <p id="critical-vulns" class="critical-number">0</p>
+                <div class="stat-sub">Vulnérabilités critiques ouvertes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <h3>Active Remediations</h3>
+                    <span class="badge badge-remediation" id="remediation-rate">—</span>
+                </div>
+                <p id="active-remediations">0</p>
+                <div class="stat-sub">Cas en cours de traitement</div>
+            </div>
+        </div>
+
+        <!-- Quick alerts / health summary -->
+        <section class="alerts" id="alerts-section">
+            <!-- Rempli dynamiquement en JS en fonction des stats -->
+        </section>
+
+        <div class="actions">
+            <button id="import-nessus-btn" class="btn btn-primary">Import from Nessus</button>
+            <button id="refresh-btn" class="btn btn-secondary">Refresh</button>
+        </div>
+
+        <!-- Nessus Scans Modal -->
+        <div id="nessus-modal" class="modal hidden">
+            <div class="modal-content" style="min-width:600px; max-height:80vh; overflow-y:auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h2>Nessus Scans</h2>
+                    <button id="close-nessus-modal" class="btn btn-secondary">Close</button>
+                </div>
+                <div id="nessus-scans-list"></div>
+            </div>
+        </div>
+
+        <!-- Critical vulnerabilities list modal -->
+        <div id="vuln-list-modal" class="modal hidden">
+            <div class="modal-content" style="min-width:620px; max-height:80vh; overflow-y:auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h2>Vulnérabilités critiques ouvertes</h2>
+                    <button id="close-vuln-modal" class="btn btn-secondary">Close</button>
+                </div>
+                <div id="vuln-list-body"></div>
+            </div>
+        </div>
+
+        <!-- Scan details modal -->
+        <div id="scan-details-modal" class="modal hidden">
+            <div class="modal-content" style="min-width:720px; max-height:80vh; overflow-y:auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h2 id="scan-details-title">Scan details</h2>
+                    <button id="close-scan-details-modal" class="btn btn-secondary">Close</button>
+                </div>
+                <div id="scan-details-meta" class="scan-details"></div>
+                <div style="margin:10px 0 8px; display:flex; gap:8px; align-items:center; font-size:0.85em; flex-wrap:wrap;">
+                    <span style="font-weight:600;">Mode :</span>
+                    <button class="btn btn-small btn-filter-mode active-mode" id="mode-severity" onclick="setFilterMode('severity')">Par sévérité</button>
+                    <button class="btn btn-small btn-filter-mode" id="mode-host" onclick="setFilterMode('host')">Par hôte</button>
+
+                    <!-- Severity filters -->
+                    <div id="filter-severity-bar" style="display:flex;gap:6px;align-items:center;">
+                        <span style="color:#9ca3af;">|</span>
+                        <button class="btn btn-small btn-filter" data-sev="all">All</button>
+                        <button class="btn btn-small btn-filter" data-sev="Critical">Critical</button>
+                        <button class="btn btn-small btn-filter" data-sev="High">High</button>
+                        <button class="btn btn-small btn-filter" data-sev="Medium">Medium</button>
+                        <button class="btn btn-small btn-filter" data-sev="Low">Low</button>
+                    </div>
+
+                    <!-- Host filter -->
+                    <div id="filter-host-bar" style="display:none;gap:6px;align-items:center;">
+                        <span style="color:#9ca3af;">|</span>
+                        <select id="host-filter-select" class="date-filter-group" style="border:1px solid #d1d5db;border-radius:8px;padding:4px 10px;font-size:0.85em;">
+                            <option value="all">Tous les hôtes</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="scan-details-body"></div>
+            </div>
+        </div>
+
+        <div class="layout-grid">
+            <div class="layout-main">
+                <div class="scans-section">
+                    <div class="section-header">
+                        <h2>Scan History</h2>
+                    </div>
+                    <div id="scans-list"></div>
+                </div>
+
+                <div class="scans-section" style="margin-top:30px;">
+                    <div class="section-header">
+                        <h2>Remediation Cases</h2>
+                        <div class="legend-inline">
+                            <span class="legend-pill status-open">open</span>
+                            <span class="legend-pill status-running">running</span>
+                            <span class="legend-pill status-completed">completed</span>
+                            <span class="legend-pill status-failed">failed</span>
+                        </div>
+                    </div>
+                    <div id="cases-list"></div>
+                </div>
+            </div>
+
+            <aside class="layout-side">
+                <div class="scans-section">
+                    <div class="section-header">
+                        <h2>Répartition par sévérité</h2>
+                    </div>
+                    <canvas id="severity-pie-chart" style="max-height:280px;"></canvas>
+                </div>
+
+                <div class="scans-section" style="margin-top:20px;">
+                    <div class="section-header">
+                        <h2>Assets / Stations</h2>
+                    </div>
+                    <div id="assets-list"></div>
+                </div>
+            </aside>
+        </div>
+
+        <!-- Asset / Station Details Modal -->
+        <div id="asset-modal" class="modal hidden">
+            <div class="modal-content" style="min-width:640px; max-height:80vh; overflow-y:auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h2 id="asset-modal-title">Station details</h2>
+                    <button id="close-asset-modal" class="btn btn-secondary">Close</button>
+                </div>
+                <div id="asset-modal-body"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toast-container"></div>
+
+    <!-- VulnBot Chat Panel -->
+    <div id="vulnbot-panel" class="vulnbot-panel vulnbot-closed">
+        <div class="vulnbot-header" onclick="toggleVulnBot()">
+            <span>🤖 VulnBot</span>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <span id="vulnbot-status-dot" class="vulnbot-dot"></span>
+                <span id="vulnbot-toggle-icon">▲</span>
+            </div>
+        </div>
+        <div class="vulnbot-body" id="vulnbot-body">
+            <div class="vulnbot-messages" id="vulnbot-messages">
+                <div class="vulnbot-msg bot">
+                    <div class="vulnbot-bubble">Bonjour 👋 Je suis VulnBot. Clique sur une vulnérabilité ou pose-moi une question.</div>
+                </div>
+            </div>
+            <div class="vulnbot-shortcuts">
+                <button onclick="vulnbotAsk('Quelles sont les vulnérabilités critiques ?')">🔴 Critiques</button>
+                <button onclick="vulnbotAsk('Historique des remédiations')">📋 Historique</button>
+                <button onclick="vulnbotAsk('Comment corriger MS17-010 ?')">🛠 MS17-010</button>
+                <button onclick="vulnbotAsk('Résumé de la posture de sécurité')">📊 Résumé</button>
+                <label class="vulnbot-upload-btn" title="Analyser un fichier .nessus">
+                    📂 Analyser .nessus
+                    <input type="file" accept=".nessus" style="display:none" onchange="vulnbotAnalyzeNessus(this)">
+                </label>
+            </div>
+            <div class="vulnbot-input-row">
+                <input id="vulnbot-input" type="text" placeholder="Pose une question..." onkeydown="if(event.key==='Enter') vulnbotSend()" />
+                <button onclick="vulnbotSend()">➤</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
